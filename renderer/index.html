@@ -15,39 +15,52 @@
 
 <body>
 
-    <header class="header">
-        <h1>Database Client</h1>
-    </header>
+<header class="header">
+    <h1>Database Client</h1>
 
-    <main class="main">
+    <div id="connectionStatus" class="status">
+        Disconnected
+    </div>
+</header>
 
-        <aside class="sidebar">
-            <h2>Databases</h2>
+<main class="main">
 
-            <div class="database-list">
-                <p class="placeholder">
-                    No databases loaded
-                </p>
-            </div>
-        </aside>
+    <aside class="sidebar">
 
-        <section class="content">
+        <h2>Databases</h2>
 
-            <div class="content-header">
-                <h2>Welcome</h2>
-            </div>
+        <button id="loadDatabases">
+            Load databases
+        </button>
 
-            <div class="content-body">
-                <p>
-                    Select a database to view its tables.
-                </p>
-            </div>
+        <div id="databaseList" class="database-list">
+            <p class="placeholder">
+                No databases loaded
+            </p>
+        </div>
 
-        </section>
+    </aside>
 
-    </main>
+    <section class="content">
 
-    <script src="renderer.js"></script>
+        <div class="content-header">
+            <h2 id="tableTitle">Select a table</h2>
+        </div>
+
+        <div id="tableInfo" class="table-info">
+            <p class="placeholder">
+                Select a database and table.
+            </p>
+        </div>
+
+        <div id="tableContainer" class="table-container">
+        </div>
+
+    </section>
+
+</main>
+
+<script src="renderer.js"></script>
 
 </body>
 </html>
