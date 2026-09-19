@@ -1,0 +1,24 @@
+{
+  "name": "databasec_desktop",
+  "version": "0.0.1",
+  "description": "desktop client for databaseC server",
+  "keywords": [
+    "client"
+  ],
+  "license": "MIT",
+  "author": "o",
+  "type": "commonjs",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    
+  },
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
+  }
+}
