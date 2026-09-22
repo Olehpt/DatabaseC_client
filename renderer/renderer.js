@@ -172,6 +172,12 @@ async function createDatabase() {
         return;
     }
 
+    if (/\s/.test(databaseName)) {
+        alert("Database name contains just letters.");
+        return;
+    }
+
+
     try {
         createDatabaseButton.disabled = true;
         connectionStatus.textContent = "Creating database...";
@@ -321,6 +327,11 @@ async function createTable() {
 
     if (!tableName) {
         tableNameInput.focus();
+        return;
+    }
+
+    if (/\s/.test(tableName)) {
+        alert("Database table name contains just letters.");
         return;
     }
 
