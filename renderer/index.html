@@ -14,7 +14,6 @@
 </head>
 
 <body>
-
 <header class="header">
     <h1>Database Client</h1>
 
@@ -24,10 +23,24 @@
 </header>
 
 <main class="main">
-
     <aside class="sidebar">
-
         <h2>Databases</h2>
+
+        <div class="action-panel">
+            <input
+                id="databaseNameInput"
+                type="text"
+                placeholder="Database name"
+                maxlength="100"
+                autocomplete="off"
+            >
+
+            <div class="action-row">
+                <button id="createDatabase">
+                    Create database
+                </button>
+            </div>
+        </div>
 
         <button id="loadDatabases">
             Load databases
@@ -39,10 +52,32 @@
             </p>
         </div>
 
+        <div id="tableActions" class="action-panel hidden">
+            <h3 id="selectedDatabaseTitle">
+                Table actions
+            </h3>
+
+            <input
+                id="tableNameInput"
+                type="text"
+                placeholder="Table name"
+                maxlength="100"
+                autocomplete="off"
+            >
+
+            <div class="action-row">
+                <button id="createTable">
+                    Create table
+                </button>
+
+                <button id="deleteTable" class="danger" disabled>
+                    Delete selected table
+                </button>
+            </div>
+        </div>
     </aside>
 
     <section class="content">
-
         <div class="content-header">
             <h2 id="tableTitle">Select a table</h2>
         </div>
@@ -55,12 +90,9 @@
 
         <div id="tableContainer" class="table-container">
         </div>
-
     </section>
-
 </main>
 
 <script src="renderer.js"></script>
-
 </body>
 </html>
