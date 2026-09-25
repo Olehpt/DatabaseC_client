@@ -88,6 +88,53 @@
             </p>
         </div>
 
+        <div id="dataActions" class="data-actions hidden">
+            <div class="action-panel data-action-panel">
+                <h3>Columns</h3>
+
+                <div class="form-grid">
+                    <input
+                        id="columnNameInput"
+                        type="text"
+                        placeholder="Column name"
+                        maxlength="100"
+                        autocomplete="off"
+                    >
+
+                    <select id="columnTypeInput">
+                        <option value="integer">Integer</option>
+                        <option value="real">Real</option>
+                        <option value="char">Char</option>
+                        <option value="string">String</option>
+                    </select>
+
+                    <button id="createColumn">
+                        Add column
+                    </button>
+                </div>
+            </div>
+
+            <div class="action-panel data-action-panel">
+                <h3 id="rowEditorTitle">Add row</h3>
+
+                <div id="rowInputContainer" class="row-input-container">
+                    <p class="placeholder">
+                        Add at least one column first.
+                    </p>
+                </div>
+
+                <div class="action-row row-editor-buttons">
+                    <button id="saveRow" disabled>
+                        Add row
+                    </button>
+
+                    <button id="cancelEditRow" class="hidden">
+                        Cancel edit
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div id="tableContainer" class="table-container">
         </div>
     </section>

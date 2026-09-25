@@ -37,20 +37,47 @@ const createTableButton =
 const deleteTableButton =
     document.getElementById("deleteTable");
 
+const dataActions =
+    document.getElementById("dataActions");
+
+const columnNameInput =
+    document.getElementById("columnNameInput");
+
+const columnTypeInput =
+    document.getElementById("columnTypeInput");
+
+const createColumnButton =
+    document.getElementById("createColumn");
+
+const rowEditorTitle =
+    document.getElementById("rowEditorTitle");
+
+const rowInputContainer =
+    document.getElementById("rowInputContainer");
+
+const saveRowButton =
+    document.getElementById("saveRow");
+
+const cancelEditRowButton =
+    document.getElementById("cancelEditRow");
+
 let selectedDatabase = null;
 let selectedTable = null;
+let selectedColumns = [];
+let editingRowIndex = null;
 
 // ---------------------------------------------------------
 // HTTP
 // ---------------------------------------------------------
 
-async function request(endpoint, method = "GET") {
+async function request(endpoint, method = "GET", body = null) {
     let result;
 
     try {
         result = await window.databaseClient.request(
             endpoint,
-            method
+            method,
+            body
         );
     }
     catch (error) {
@@ -242,7 +269,11 @@ async function loadTables(databaseName) {
     try {
         selectedDatabase = databaseName;
         selectedTable = null;
+        selectedColumns = [];
+        editingRowIndex = null;
 
+        dataActions.classList.add("hidden");
+        resetRowEditor();
         tableActions.classList.remove("hidden");
         selectedDatabaseTitle.textContent =
             `Tables: ${databaseName}`;
@@ -425,12 +456,17 @@ async function loadTable(
         tableTitle.textContent =
             `${databaseName} / ${tableName}`;
 
+        selectedColumns = data.columns || [];
+        editingRowIndex = null;
+
         renderTableInfo(data);
+        renderRowEditor(selectedColumns);
+        dataActions.classList.remove("hidden");
 
         await loadRows(
             databaseName,
             tableName,
-            data.columns || []
+            selectedColumns
         );
     }
     catch (error) {
@@ -504,11 +540,35 @@ function renderRows(
         const cell =
             document.createElement("th");
 
-        cell.textContent =
+        const headerContent =
+            document.createElement("div");
+        headerContent.className = "column-header";
+
+        const label =
+            document.createElement("span");
+        label.textContent =
             `${column.name} (${column.type})`;
 
+        const deleteButton =
+            document.createElement("button");
+        deleteButton.className = "column-delete-button";
+        deleteButton.textContent = "×";
+        deleteButton.title = `Delete column ${column.name}`;
+        deleteButton.addEventListener(
+            "click",
+            () => deleteColumn(column.name)
+        );
+
+        headerContent.appendChild(label);
+        headerContent.appendChild(deleteButton);
+        cell.appendChild(headerContent);
         headerRow.appendChild(cell);
     }
+
+    const actionsHeader =
+        document.createElement("th");
+    actionsHeader.textContent = "Actions";
+    headerRow.appendChild(actionsHeader);
 
     header.appendChild(headerRow);
     table.appendChild(header);
@@ -516,7 +576,7 @@ function renderRows(
     const body =
         document.createElement("tbody");
 
-    for (const row of rows) {
+    rows.forEach((row, rowIndex) => {
         const tableRow =
             document.createElement("tr");
 
@@ -528,11 +588,292 @@ function renderRows(
             tableRow.appendChild(cell);
         }
 
+        const actionsCell =
+            document.createElement("td");
+        actionsCell.className = "row-actions-cell";
+
+        const editButton =
+            document.createElement("button");
+        editButton.className = "row-action-button";
+        editButton.textContent = "Edit";
+        editButton.addEventListener(
+            "click",
+            () => startEditRow(rowIndex, row)
+        );
+
+        const deleteButton =
+            document.createElement("button");
+        deleteButton.className = "row-action-button danger";
+        deleteButton.textContent = "Delete";
+        deleteButton.addEventListener(
+            "click",
+            () => deleteRow(rowIndex)
+        );
+
+        actionsCell.appendChild(editButton);
+        actionsCell.appendChild(deleteButton);
+        tableRow.appendChild(actionsCell);
         body.appendChild(tableRow);
-    }
+    });
 
     table.appendChild(body);
     tableContainer.appendChild(table);
+}
+
+
+// ---------------------------------------------------------
+// Columns and row editing
+// ---------------------------------------------------------
+
+async function createColumn() {
+    if (!selectedDatabase || !selectedTable) {
+        return;
+    }
+
+    const columnName = normalizeName(columnNameInput.value);
+
+    if (!columnName) {
+        columnNameInput.focus();
+        return;
+    }
+
+    if (/\s/.test(columnName)) {
+        alert("Column name cannot contain spaces.");
+        return;
+    }
+
+    try {
+        createColumnButton.disabled = true;
+
+        await request(
+            `/databases/${encodeURIComponent(selectedDatabase)}` +
+            `/tables/${encodeURIComponent(selectedTable)}/columns`,
+            "POST",
+            {
+                name: columnName,
+                type: columnTypeInput.value
+            }
+        );
+
+        columnNameInput.value = "";
+        await loadTable(selectedDatabase, selectedTable);
+    }
+    catch (error) {
+        console.error(error);
+        alert(error.message);
+    }
+    finally {
+        createColumnButton.disabled = false;
+    }
+}
+
+async function deleteColumn(columnName) {
+    if (!selectedDatabase || !selectedTable) {
+        return;
+    }
+
+    const confirmed = window.confirm(
+        `Delete column "${columnName}"?`
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        await request(
+            `/databases/${encodeURIComponent(selectedDatabase)}` +
+            `/tables/${encodeURIComponent(selectedTable)}` +
+            `/columns/${encodeURIComponent(columnName)}`,
+            "DELETE"
+        );
+
+        await loadTable(selectedDatabase, selectedTable);
+    }
+    catch (error) {
+        console.error(error);
+        alert(error.message);
+    }
+}
+
+function renderRowEditor(columns, values = null) {
+    rowInputContainer.innerHTML = "";
+
+    if (!columns || columns.length === 0) {
+        rowInputContainer.innerHTML =
+            '<p class="placeholder">Add at least one column first.</p>';
+        saveRowButton.disabled = true;
+        return;
+    }
+
+    columns.forEach((column, index) => {
+        const field = document.createElement("div");
+        field.className = "row-field";
+
+        const label = document.createElement("label");
+        label.textContent = `${column.name} (${column.type})`;
+
+        const input = document.createElement("input");
+        input.className = "row-value-input";
+        input.dataset.index = index;
+        input.dataset.type = column.type;
+        input.placeholder = column.name;
+        input.autocomplete = "off";
+
+        if (values && index < values.length) {
+            input.value = values[index] ?? "";
+        }
+
+        field.appendChild(label);
+        field.appendChild(input);
+        rowInputContainer.appendChild(field);
+    });
+
+    saveRowButton.disabled = false;
+}
+
+function parseInputValue(rawValue, type) {
+    const normalizedType = String(type).toLowerCase();
+
+    if (normalizedType === "integer") {
+        if (!/^-?\d+$/.test(rawValue.trim())) {
+            throw new Error(`"${rawValue}" is not a valid integer.`);
+        }
+
+        return Number.parseInt(rawValue, 10);
+    }
+
+    if (normalizedType === "real") {
+        if (rawValue.trim() === "" || Number.isNaN(Number(rawValue))) {
+            throw new Error(`"${rawValue}" is not a valid real number.`);
+        }
+
+        return Number(rawValue);
+    }
+
+    if (normalizedType === "char") {
+        if (rawValue.length !== 1) {
+            throw new Error("Char value must contain exactly one character.");
+        }
+
+        return rawValue;
+    }
+
+    return rawValue;
+}
+
+function collectRowValues() {
+    const inputs =
+        rowInputContainer.querySelectorAll(".row-value-input");
+
+    return Array.from(inputs).map(input =>
+        parseInputValue(input.value, input.dataset.type)
+    );
+}
+
+async function saveRow() {
+    if (!selectedDatabase || !selectedTable) {
+        return;
+    }
+
+    let values;
+
+    try {
+        values = collectRowValues();
+    }
+    catch (error) {
+        alert(error.message);
+        return;
+    }
+
+    try {
+        saveRowButton.disabled = true;
+
+        const baseEndpoint =
+            `/databases/${encodeURIComponent(selectedDatabase)}` +
+            `/tables/${encodeURIComponent(selectedTable)}/rows`;
+
+        if (editingRowIndex === null) {
+            await request(
+                baseEndpoint,
+                "POST",
+                { values }
+            );
+        }
+        else {
+            await request(
+                `${baseEndpoint}/${editingRowIndex}`,
+                "PUT",
+                { values }
+            );
+        }
+
+        editingRowIndex = null;
+        rowEditorTitle.textContent = "Add row";
+        saveRowButton.textContent = "Add row";
+        cancelEditRowButton.classList.add("hidden");
+
+        await loadTable(selectedDatabase, selectedTable);
+    }
+    catch (error) {
+        console.error(error);
+        alert(error.message);
+    }
+    finally {
+        saveRowButton.disabled = selectedColumns.length === 0;
+    }
+}
+
+function startEditRow(rowIndex, row) {
+    editingRowIndex = rowIndex;
+    rowEditorTitle.textContent = `Edit row ${rowIndex}`;
+    saveRowButton.textContent = "Save changes";
+    cancelEditRowButton.classList.remove("hidden");
+    renderRowEditor(selectedColumns, row.values || []);
+
+    const firstInput =
+        rowInputContainer.querySelector(".row-value-input");
+
+    if (firstInput) {
+        firstInput.focus();
+    }
+}
+
+function resetRowEditor() {
+    editingRowIndex = null;
+    rowEditorTitle.textContent = "Add row";
+    saveRowButton.textContent = "Add row";
+    cancelEditRowButton.classList.add("hidden");
+    renderRowEditor(selectedColumns);
+}
+
+async function deleteRow(rowIndex) {
+    if (!selectedDatabase || !selectedTable) {
+        return;
+    }
+
+    const confirmed = window.confirm(
+        `Delete row ${rowIndex}?`
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        await request(
+            `/databases/${encodeURIComponent(selectedDatabase)}` +
+            `/tables/${encodeURIComponent(selectedTable)}` +
+            `/rows/${rowIndex}`,
+            "DELETE"
+        );
+
+        await loadTable(selectedDatabase, selectedTable);
+    }
+    catch (error) {
+        console.error(error);
+        alert(error.message);
+    }
 }
 
 // ---------------------------------------------------------
@@ -542,7 +883,11 @@ function renderRows(
 function clearSelection() {
     selectedDatabase = null;
     selectedTable = null;
+    selectedColumns = [];
+    editingRowIndex = null;
 
+    dataActions.classList.add("hidden");
+    resetRowEditor();
     tableActions.classList.add("hidden");
     deleteTableButton.disabled = true;
     tableTitle.textContent = "Select a table";
@@ -570,6 +915,21 @@ createTableButton.addEventListener(
     createTable
 );
 
+createColumnButton.addEventListener(
+    "click",
+    createColumn
+);
+
+saveRowButton.addEventListener(
+    "click",
+    saveRow
+);
+
+cancelEditRowButton.addEventListener(
+    "click",
+    resetRowEditor
+);
+
 databaseNameInput.addEventListener(
     "keydown",
     event => {
@@ -584,6 +944,16 @@ tableNameInput.addEventListener(
     event => {
         if (event.key === "Enter") {
             createTable();
+        }
+    }
+);
+
+
+columnNameInput.addEventListener(
+    "keydown",
+    event => {
+        if (event.key === "Enter") {
+            createColumn();
         }
     }
 );

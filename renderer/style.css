@@ -10,7 +10,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
     font: inherit;
 }
 
@@ -50,7 +51,8 @@ input {
     margin-top: 0;
 }
 
-.sidebar h3 {
+.sidebar h3,
+.data-actions h3 {
     margin: 0 0 10px;
     font-size: 15px;
 }
@@ -69,7 +71,9 @@ input {
     background-color: #f8f8f8;
 }
 
-.action-panel.hidden {
+.action-panel.hidden,
+.data-actions.hidden,
+.hidden {
     display: none;
 }
 
@@ -98,7 +102,8 @@ input {
 }
 
 .danger,
-.delete-button {
+.delete-button,
+.column-delete-button {
     color: #9d0000;
 }
 
@@ -154,7 +159,9 @@ input {
     cursor: pointer;
 }
 
-.delete-button:hover {
+.delete-button:hover,
+.column-delete-button:hover,
+.row-action-button:hover {
     background-color: #eee;
 }
 
@@ -187,6 +194,55 @@ input {
     margin-bottom: 20px;
 }
 
+.data-actions {
+    display: grid;
+    grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1.2fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.data-action-panel {
+    margin-bottom: 0;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 130px auto;
+    gap: 8px;
+}
+
+.form-grid input,
+.form-grid select,
+.form-grid button,
+.row-input-container input {
+    min-width: 0;
+    padding: 9px;
+    border: 1px solid #bbb;
+    background-color: white;
+}
+
+.row-input-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.row-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.row-field label {
+    font-size: 12px;
+    color: #555;
+}
+
+.row-editor-buttons {
+    max-width: 320px;
+}
+
 .table-container {
     overflow-x: auto;
 }
@@ -205,4 +261,37 @@ td {
 
 th {
     background-color: #eee;
+}
+
+.column-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.column-delete-button,
+.row-action-button {
+    padding: 4px 7px;
+    border: 1px solid #ccc;
+    background-color: white;
+    cursor: pointer;
+}
+
+.row-actions-cell {
+    white-space: nowrap;
+}
+
+.row-actions-cell .row-action-button + .row-action-button {
+    margin-left: 6px;
+}
+
+@media (max-width: 1000px) {
+    .data-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
 }

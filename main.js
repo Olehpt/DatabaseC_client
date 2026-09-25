@@ -5,28 +5,43 @@ const http = require('http');
 const SERVER_HOST = 'localhost';
 const SERVER_PORT = 18080;
 
-function requestServer(endpoint, method = 'GET') {
+function requestServer(endpoint, method = 'GET', body = null) {
     return new Promise((resolve, reject) => {
+        const requestBody = body === null || body === undefined
+            ? null
+            : JSON.stringify(body);
+
+        const options = {
+            hostname: SERVER_HOST,
+            port: SERVER_PORT,
+            path: endpoint,
+            method
+        };
+
+        if (requestBody !== null) {
+            options.headers = {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(requestBody)
+            };
+        }
+
         const request = http.request(
-            {
-                hostname: SERVER_HOST,
-                port: SERVER_PORT,
-                path: endpoint,
-                method
-            },
+            options,
             response => {
-                let body = '';
+                let responseBody = '';
 
                 response.setEncoding('utf8');
                 response.on('data', chunk => {
-                    body += chunk;
+                    responseBody += chunk;
                 });
 
                 response.on('end', () => {
-                    let parsedBody = body;
+                    let parsedBody = responseBody;
 
                     try {
-                        parsedBody = body ? JSON.parse(body) : null;
+                        parsedBody = responseBody
+                            ? JSON.parse(responseBody)
+                            : null;
                     }
                     catch {
                         // Server errors may be plain text.
@@ -43,13 +58,21 @@ function requestServer(endpoint, method = 'GET') {
         );
 
         request.on('error', reject);
+
+        if (requestBody !== null) {
+            request.write(requestBody);
+        }
+
         request.end();
     });
 }
 
-ipcMain.handle('server-request', async (_event, { endpoint, method }) => {
-    return await requestServer(endpoint, method);
-});
+ipcMain.handle(
+    'server-request',
+    async (_event, { endpoint, method, body }) => {
+        return await requestServer(endpoint, method, body);
+    }
+);
 
 function createWindow() {
     const window = new BrowserWindow({
