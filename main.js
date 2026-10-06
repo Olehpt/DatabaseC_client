@@ -1,15 +1,16 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const fs = require('fs/promises');
 const path = require('path');
 const http = require('http');
 
 const SERVER_HOST = 'localhost';
 const SERVER_PORT = 18080;
 
-function requestServer(endpoint, method = 'GET', body = null) {
+function requestServer(endpoint, method = 'GET', body = null, binaryResponse = false) {
     return new Promise((resolve, reject) => {
         const requestBody = body === null || body === undefined
             ? null
-            : JSON.stringify(body);
+            : Buffer.isBuffer(body) ? body : JSON.stringify(body);
 
         const options = {
             hostname: SERVER_HOST,
@@ -20,7 +21,7 @@ function requestServer(endpoint, method = 'GET', body = null) {
 
         if (requestBody !== null) {
             options.headers = {
-                'Content-Type': 'application/json',
+                'Content-Type': Buffer.isBuffer(body) ? 'application/octet-stream' : 'application/json',
                 'Content-Length': Buffer.byteLength(requestBody)
             };
         }
@@ -28,18 +29,19 @@ function requestServer(endpoint, method = 'GET', body = null) {
         const request = http.request(
             options,
             response => {
-                let responseBody = '';
-
-                response.setEncoding('utf8');
+                const chunks = [];
+                response.on('error', reject);
                 response.on('data', chunk => {
-                    responseBody += chunk;
+                    chunks.push(chunk);
                 });
 
                 response.on('end', () => {
-                    let parsedBody = responseBody;
+                    const bytes = Buffer.concat(chunks);
+                    const responseBody = bytes.toString('utf8');
+                    let parsedBody = binaryResponse && response.statusCode < 300 ? bytes : responseBody;
 
                     try {
-                        parsedBody = responseBody
+                        if (!binaryResponse || response.statusCode >= 300) parsedBody = responseBody
                             ? JSON.parse(responseBody)
                             : null;
                     }
@@ -58,6 +60,7 @@ function requestServer(endpoint, method = 'GET', body = null) {
         );
 
         request.on('error', reject);
+        request.setTimeout(30000, () => request.destroy(new Error('Server request timed out')));
 
         if (requestBody !== null) {
             request.write(requestBody);
@@ -73,6 +76,36 @@ ipcMain.handle(
         return await requestServer(endpoint, method, body);
     }
 );
+
+function fileError(error) { return { ok: false, message: error.message }; }
+function checkResult(result) {
+    if (!result.ok) throw new Error(`${result.status}: ${result.body?.message || result.body || result.statusText}`);
+}
+ipcMain.handle('database-export', async (event, name) => {
+    try {
+        const target = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender), {
+            title: 'Export database', buttonLabel: 'Save', defaultPath: `${name}.bin`, filters: [{ name: 'DatabaseC', extensions: ['bin'] }]
+        });
+        if (target.canceled) return { canceled: true };
+        const result = await requestServer(`/databases/${encodeURIComponent(name)}/export`, 'GET', null, true);
+        checkResult(result);
+        await fs.writeFile(target.filePath, result.body);
+        return { ok: true };
+    } catch (error) { return fileError(error); }
+});
+ipcMain.handle('database-import', async (event, name, replace = false) => {
+    try {
+        const source = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
+            title: 'Import database', buttonLabel: 'Open', properties: ['openFile'], filters: [{ name: 'DatabaseC', extensions: ['bin'] }]
+        });
+        if (source.canceled) return { canceled: true };
+        const filePath = source.filePaths[0];
+        if ((await fs.stat(filePath)).size > 64 * 1024 * 1024) throw new Error('The database exceeds 64 MiB.');
+        const result = await requestServer(`/databases/${encodeURIComponent(name)}/import`, replace ? 'PUT' : 'POST', await fs.readFile(filePath));
+        checkResult(result);
+        return { ok: true };
+    } catch (error) { return fileError(error); }
+});
 
 function createWindow() {
     const window = new BrowserWindow({
